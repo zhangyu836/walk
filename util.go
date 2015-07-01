@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 import (
@@ -38,6 +39,13 @@ func init() {
 	groupSepB = byte(buf[0])
 	groupSepS = syscall.UTF16ToString(buf[0:1])
 	groupSepUint16 = buf[0]
+}
+
+var escapedPtr unsafe.Pointer
+
+func escape(ptr unsafe.Pointer) {
+	escapedPtr = ptr
+	escapedPtr = nil
 }
 
 func maxi(a, b int) int {
