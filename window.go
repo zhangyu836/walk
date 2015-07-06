@@ -700,13 +700,20 @@ func (wb *WindowBase) Invalidate() error {
 
 func windowText(hwnd win.HWND) string {
 	textLength := win.SendMessage(hwnd, win.WM_GETTEXTLENGTH, 0, 0)
+
 	buf := make([]uint16, textLength+1)
+	defer escape(unsafe.Pointer(&buf))
+
 	win.SendMessage(hwnd, win.WM_GETTEXT, uintptr(textLength+1), uintptr(unsafe.Pointer(&buf[0])))
+
 	return syscall.UTF16ToString(buf)
 }
 
 func setWindowText(hwnd win.HWND, text string) error {
-	if win.TRUE != win.SendMessage(hwnd, win.WM_SETTEXT, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(text)))) {
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(text))
+	defer escape(lp)
+
+	if win.TRUE != win.SendMessage(hwnd, win.WM_SETTEXT, 0, uintptr(lp)) {
 		return newError("WM_SETTEXT failed")
 	}
 
@@ -1136,7 +1143,7 @@ func windowFromHandle(hwnd win.HWND) Window {
 	return nil
 }
 
-func defaultWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) (result uintptr) {
+func defaultWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	defer func() {
 		if len(appSingleton.panickingPublisher.event.handlers) > 0 {
 			var err error
@@ -1162,9 +1169,7 @@ func defaultWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) (result u
 		return win.DefWindowProc(hwnd, msg, wParam, lParam)
 	}
 
-	result = wi.WndProc(hwnd, msg, wParam, lParam)
-
-	return
+	return wi.WndProc(hwnd, msg, wParam, lParam)
 }
 
 func (wb *WindowBase) handleKeyDown(wParam, lParam uintptr) {

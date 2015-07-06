@@ -216,6 +216,7 @@ func (tb *ToolBar) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 			actionId := uint16(nmtb.IItem)
 			if action := actionsById[actionId]; action != nil {
 				var r win.RECT
+				defer escape(unsafe.Pointer(&r))
 				if 0 == tb.SendMessage(win.TB_GETRECT, uintptr(actionId), uintptr(unsafe.Pointer(&r))) {
 					break
 				}
@@ -242,7 +243,7 @@ func (tb *ToolBar) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 	return tb.WidgetBase.WndProc(hwnd, msg, wParam, lParam)
 }
 
-func (tb *ToolBar) initButtonForAction(action *Action, state, style *byte, image *int32, text *uintptr) (err error) {
+func (tb *ToolBar) initButtonForAction(action *Action, state, style *byte, image *int32, text **uint16) (err error) {
 	if tb.hasStyleBits(win.CCS_VERT) {
 		*state |= win.TBSTATE_WRAP
 	} else if tb.defaultButtonWidth == 0 {
@@ -292,7 +293,7 @@ func (tb *ToolBar) initButtonForAction(action *Action, state, style *byte, image
 		actionText = action.Text()
 	}
 
-	*text = uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(actionText)))
+	*text = syscall.StringToUTF16Ptr(actionText)
 
 	return
 }
@@ -301,18 +302,25 @@ func (tb *ToolBar) onActionChanged(action *Action) error {
 	tbbi := win.TBBUTTONINFO{
 		DwMask: win.TBIF_IMAGE | win.TBIF_STATE | win.TBIF_STYLE | win.TBIF_TEXT,
 	}
+	defer escape(unsafe.Pointer(&tbbi))
 
 	tbbi.CbSize = uint32(unsafe.Sizeof(tbbi))
+
+	var pszText *uint16
 
 	if err := tb.initButtonForAction(
 		action,
 		&tbbi.FsState,
 		&tbbi.FsStyle,
 		&tbbi.IImage,
-		&tbbi.PszText); err != nil {
+		&pszText); err != nil {
 
 		return err
 	}
+
+	defer escape(unsafe.Pointer(pszText))
+
+	tbbi.PszText = uintptr(unsafe.Pointer(pszText))
 
 	if 0 == tb.SendMessage(
 		win.TB_SETBUTTONINFO,
@@ -356,16 +364,23 @@ func (tb *ToolBar) insertAction(action *Action, visibleChanged bool) (err error)
 	tbb := win.TBBUTTON{
 		IdCommand: int32(action.id),
 	}
+	defer escape(unsafe.Pointer(&tbb))
+
+	var iString *uint16
 
 	if err = tb.initButtonForAction(
 		action,
 		&tbb.FsState,
 		&tbb.FsStyle,
 		&tbb.IBitmap,
-		&tbb.IString); err != nil {
+		&iString); err != nil {
 
 		return
 	}
+
+	defer escape(unsafe.Pointer(iString))
+
+	tbb.IString = uintptr(unsafe.Pointer(iString))
 
 	tb.SetVisible(true)
 

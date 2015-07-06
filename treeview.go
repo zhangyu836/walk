@@ -16,6 +16,7 @@ import (
 type treeViewItemInfo struct {
 	handle       win.HTREEITEM
 	child2Handle map[TreeItem]win.HTREEITEM
+	utf16Text    *uint16
 }
 
 type TreeView struct {
@@ -29,7 +30,7 @@ type TreeView struct {
 	currItem                      TreeItem
 	hIml                          win.HIMAGELIST
 	usingSysIml                   bool
-	imageUintptr2Index            map[uintptr]int32
+	imagePtr2Index                map[unsafe.Pointer]int32
 	filePath2IconIndex            map[string]int32
 	expandedChangedPublisher      TreeItemEventPublisher
 	currentItemChangedPublisher   EventPublisher
@@ -159,6 +160,7 @@ func (tv *TreeView) SetCurrentItem(item TreeItem) error {
 
 func (tv *TreeView) ItemAt(x, y int) TreeItem {
 	hti := win.TVHITTESTINFO{Pt: win.POINT{int32(x), int32(y)}}
+	defer escape(unsafe.Pointer(&hti))
 
 	tv.SendMessage(win.TVM_HITTEST, 0, uintptr(unsafe.Pointer(&hti)))
 
@@ -216,7 +218,7 @@ func (tv *TreeView) applyImageListForImage(image interface{}) {
 
 	tv.SendMessage(win.TVM_SETIMAGELIST, 0, uintptr(tv.hIml))
 
-	tv.imageUintptr2Index = make(map[uintptr]int32)
+	tv.imagePtr2Index = make(map[unsafe.Pointer]int32)
 	tv.filePath2IconIndex = make(map[string]int32)
 }
 
@@ -226,7 +228,7 @@ func (tv *TreeView) disposeImageListAndCaches() {
 	}
 	tv.hIml = 0
 
-	tv.imageUintptr2Index = nil
+	tv.imagePtr2Index = nil
 	tv.filePath2IconIndex = nil
 }
 
@@ -244,7 +246,7 @@ func (tv *TreeView) setTVITEMImageInfo(tvi *win.TVITEM, item TreeItem) {
 			imager.Image(),
 			tv.hIml,
 			tv.usingSysIml,
-			tv.imageUintptr2Index,
+			tv.imagePtr2Index,
 			tv.filePath2IconIndex)
 
 		tvi.ISelectedImage = tvi.IImage
@@ -253,6 +255,8 @@ func (tv *TreeView) setTVITEMImageInfo(tvi *win.TVITEM, item TreeItem) {
 
 func (tv *TreeView) insertItem(index int, item TreeItem) (win.HTREEITEM, error) {
 	var tvins win.TVINSERTSTRUCT
+	defer escape(unsafe.Pointer(&tvins))
+
 	tvi := &tvins.Item
 
 	tvi.Mask = win.TVIF_CHILDREN | win.TVIF_TEXT
@@ -293,7 +297,7 @@ func (tv *TreeView) insertItem(index int, item TreeItem) (win.HTREEITEM, error) 
 	if hItem == 0 {
 		return 0, newError("TVM_INSERTITEM failed")
 	}
-	tv.item2Info[item] = &treeViewItemInfo{hItem, make(map[TreeItem]win.HTREEITEM)}
+	tv.item2Info[item] = &treeViewItemInfo{hItem, make(map[TreeItem]win.HTREEITEM), nil}
 	tv.handle2Item[hItem] = item
 
 	if !tv.lazyPopulation {
@@ -328,6 +332,7 @@ func (tv *TreeView) updateItem(item TreeItem) error {
 		HItem:   tv.item2Info[item].handle,
 		PszText: win.LPSTR_TEXTCALLBACK,
 	}
+	defer escape(unsafe.Pointer(tvi))
 
 	tv.setTVITEMImageInfo(tvi, item)
 
@@ -377,6 +382,7 @@ func (tv *TreeView) Expanded(item TreeItem) bool {
 		Mask:      win.TVIF_STATE,
 		StateMask: win.TVIS_EXPANDED,
 	}
+	defer escape(unsafe.Pointer(tvi))
 
 	if 0 == tv.SendMessage(win.TVM_GETITEM, 0, uintptr(unsafe.Pointer(tvi))) {
 		newError("SendMessage(TVM_GETITEM) failed")
@@ -419,7 +425,9 @@ func (tv *TreeView) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 			item := tv.handle2Item[nmtvdi.Item.HItem]
 
 			if nmtvdi.Item.Mask&win.TVIF_TEXT != 0 {
-				nmtvdi.Item.PszText = uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(item.Text())))
+				info := tv.item2Info[item]
+				info.utf16Text = syscall.StringToUTF16Ptr(item.Text())
+				nmtvdi.Item.PszText = uintptr(unsafe.Pointer(info.utf16Text))
 			}
 			if nmtvdi.Item.Mask&win.TVIF_CHILDREN != 0 {
 				nmtvdi.Item.CChildren = int32(item.ChildCount())

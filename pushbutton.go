@@ -39,6 +39,7 @@ func (*PushButton) LayoutFlags() LayoutFlags {
 
 func (pb *PushButton) MinSizeHint() Size {
 	var s win.SIZE
+	defer escape(unsafe.Pointer(&s))
 
 	pb.SendMessage(win.BCM_GETIDEALSIZE, 0, uintptr(unsafe.Pointer(&s)))
 

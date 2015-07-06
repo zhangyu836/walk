@@ -237,6 +237,8 @@ func (tw *TabWidget) resizePages() {
 		r.Right - r.Left + p.X,
 		r.Bottom - r.Top + p.Y,
 	}
+	defer escape(unsafe.Pointer(&r))
+
 	win.SendMessage(tw.hWndTab, win.TCM_ADJUSTRECT, 0, uintptr(unsafe.Pointer(&r)))
 
 	for _, page := range tw.pages.items {
@@ -304,6 +306,7 @@ func (tw *TabWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) 
 func (tw *TabWidget) onPageChanged(page *TabPage) (err error) {
 	index := tw.pages.Index(page)
 	item := tw.tcitemFromPage(page)
+	defer escape(unsafe.Pointer(item))
 
 	if 0 == win.SendMessage(tw.hWndTab, win.TCM_SETITEM, uintptr(index), uintptr(unsafe.Pointer(item))) {
 		return newError("SendMessage(TCM_SETITEM) failed")
@@ -318,6 +321,7 @@ func (tw *TabWidget) onInsertingPage(index int, page *TabPage) (err error) {
 
 func (tw *TabWidget) onInsertedPage(index int, page *TabPage) (err error) {
 	item := tw.tcitemFromPage(page)
+	defer escape(unsafe.Pointer(item))
 
 	if idx := int(win.SendMessage(tw.hWndTab, win.TCM_INSERTITEM, uintptr(index), uintptr(unsafe.Pointer(item)))); idx == -1 {
 		return newError("SendMessage(TCM_INSERTITEM) failed")

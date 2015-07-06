@@ -89,6 +89,8 @@ func NewLineEdit(parent Container) (*LineEdit, error) {
 
 func (le *LineEdit) CueBanner() string {
 	buf := make([]uint16, 128)
+	defer escape(unsafe.Pointer(&buf))
+
 	if win.FALSE == le.SendMessage(win.EM_GETCUEBANNER, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) {
 		newError("EM_GETCUEBANNER failed")
 		return ""
@@ -98,7 +100,10 @@ func (le *LineEdit) CueBanner() string {
 }
 
 func (le *LineEdit) SetCueBanner(value string) error {
-	if win.FALSE == le.SendMessage(win.EM_SETCUEBANNER, win.FALSE, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(value)))) {
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(value))
+	defer escape(lp)
+
+	if win.FALSE == le.SendMessage(win.EM_SETCUEBANNER, win.FALSE, uintptr(lp)) {
 		return newError("EM_SETCUEBANNER failed")
 	}
 
@@ -122,6 +127,9 @@ func (le *LineEdit) SetText(value string) error {
 }
 
 func (le *LineEdit) TextSelection() (start, end int) {
+	defer escape(unsafe.Pointer(&start))
+	defer escape(unsafe.Pointer(&end))
+
 	le.SendMessage(win.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }
@@ -185,7 +193,6 @@ func (le *LineEdit) sizeHintForLimit(limit int) (size Size) {
 }
 
 func (le *LineEdit) initCharWidth() {
-
 	font := le.Font()
 	if font == le.charWidthFont {
 		return

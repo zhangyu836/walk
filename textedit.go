@@ -77,6 +77,9 @@ func (te *TextEdit) SetText(value string) error {
 }
 
 func (te *TextEdit) TextSelection() (start, end int) {
+	defer escape(unsafe.Pointer(&start))
+	defer escape(unsafe.Pointer(&end))
+
 	te.SendMessage(win.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }
@@ -86,9 +89,10 @@ func (te *TextEdit) SetTextSelection(start, end int) {
 }
 
 func (te *TextEdit) ReplaceSelectedText(text string, canUndo bool) {
-	te.SendMessage(win.EM_REPLACESEL,
-		uintptr(win.BoolToBOOL(canUndo)),
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(text))))
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(text))
+	defer escape(lp)
+
+	te.SendMessage(win.EM_REPLACESEL, uintptr(win.BoolToBOOL(canUndo)), uintptr(lp))
 }
 
 func (te *TextEdit) AppendText(value string) {

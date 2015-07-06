@@ -110,6 +110,7 @@ func (de *DateEdit) timeToSystemTime(t time.Time) *win.SYSTEMTIME {
 
 func (de *DateEdit) systemTime() (*win.SYSTEMTIME, error) {
 	var st win.SYSTEMTIME
+	defer escape(unsafe.Pointer(&st))
 
 	switch de.SendMessage(win.DTM_GETSYSTEMTIME, 0, uintptr(unsafe.Pointer(&st))) {
 	case win.GDT_VALID:
@@ -134,6 +135,8 @@ func (de *DateEdit) setSystemTime(st *win.SYSTEMTIME) error {
 		wParam = win.GDT_NONE
 	}
 
+	defer escape(unsafe.Pointer(st))
+
 	if 0 == de.SendMessage(win.DTM_SETSYSTEMTIME, wParam, uintptr(unsafe.Pointer(st))) {
 		return newError("SendMessage(DTM_SETSYSTEMTIME)")
 	}
@@ -152,9 +155,10 @@ func (de *DateEdit) Format() string {
 }
 
 func (de *DateEdit) SetFormat(format string) error {
-	lp := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(format)))
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(format))
+	defer escape(lp)
 
-	if 0 == de.SendMessage(win.DTM_SETFORMAT, 0, lp) {
+	if 0 == de.SendMessage(win.DTM_SETFORMAT, 0, uintptr(lp)) {
 		return newErr("DTM_SETFORMAT failed")
 	}
 
@@ -165,6 +169,7 @@ func (de *DateEdit) SetFormat(format string) error {
 
 func (de *DateEdit) Range() (min, max time.Time) {
 	var st [2]win.SYSTEMTIME
+	defer escape(unsafe.Pointer(&st))
 
 	ret := de.SendMessage(win.DTM_GETRANGE, 0, uintptr(unsafe.Pointer(&st[0])))
 
@@ -189,6 +194,8 @@ func (de *DateEdit) SetRange(min, max time.Time) error {
 	}
 
 	var st [2]win.SYSTEMTIME
+	defer escape(unsafe.Pointer(&st))
+
 	var wParam uintptr
 
 	if !min.IsZero() {

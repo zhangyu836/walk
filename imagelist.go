@@ -109,9 +109,9 @@ func iconIndexAndHImlForFilePath(filePath string) (int32, win.HIMAGELIST) {
 	return -1, 0
 }
 
-func imageIndexMaybeAdd(image interface{}, hIml win.HIMAGELIST, isSysIml bool, imageUintptr2Index map[uintptr]int32, filePath2IconIndex map[string]int32) int32 {
+func imageIndexMaybeAdd(image interface{}, hIml win.HIMAGELIST, isSysIml bool, imagePtr2Index map[unsafe.Pointer]int32, filePath2IconIndex map[string]int32) int32 {
 	if !isSysIml {
-		return imageIndexAddIfNotExists(image, hIml, imageUintptr2Index)
+		return imageIndexAddIfNotExists(image, hIml, imagePtr2Index)
 	} else if filePath, ok := image.(string); ok {
 		if iIcon, ok := filePath2IconIndex[filePath]; ok {
 			return iIcon
@@ -126,24 +126,24 @@ func imageIndexMaybeAdd(image interface{}, hIml win.HIMAGELIST, isSysIml bool, i
 	return -1
 }
 
-func imageIndexAddIfNotExists(image interface{}, hIml win.HIMAGELIST, imageUintptr2Index map[uintptr]int32) int32 {
+func imageIndexAddIfNotExists(image interface{}, hIml win.HIMAGELIST, imagePtr2Index map[unsafe.Pointer]int32) int32 {
 	imageIndex := int32(-1)
 
 	if image != nil {
-		var ptr uintptr
+		var ptr unsafe.Pointer
 		switch img := image.(type) {
 		case *Bitmap:
-			ptr = uintptr(unsafe.Pointer(img))
+			ptr = unsafe.Pointer(img)
 
 		case *Icon:
-			ptr = uintptr(unsafe.Pointer(img))
+			ptr = unsafe.Pointer(img)
 		}
 
-		if ptr == 0 {
+		if ptr == nil {
 			return -1
 		}
 
-		if imageIndex, ok := imageUintptr2Index[ptr]; ok {
+		if imageIndex, ok := imagePtr2Index[ptr]; ok {
 			return imageIndex
 		}
 
@@ -156,7 +156,7 @@ func imageIndexAddIfNotExists(image interface{}, hIml win.HIMAGELIST, imageUintp
 		}
 
 		if imageIndex > -1 {
-			imageUintptr2Index[ptr] = imageIndex
+			imagePtr2Index[ptr] = imageIndex
 		}
 	}
 

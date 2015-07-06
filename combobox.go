@@ -230,9 +230,10 @@ func (cb *ComboBox) itemString(index int) string {
 
 func (cb *ComboBox) insertItemAt(index int) error {
 	str := cb.itemString(index)
-	lp := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(str)))
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(str))
+	defer escape(lp)
 
-	if win.CB_ERR == cb.SendMessage(win.CB_INSERTSTRING, uintptr(index), lp) {
+	if win.CB_ERR == cb.SendMessage(win.CB_INSERTSTRING, uintptr(index), uintptr(lp)) {
 		return newError("SendMessage(CB_INSERTSTRING)")
 	}
 
@@ -516,6 +517,9 @@ func (cb *ComboBox) SetText(value string) error {
 }
 
 func (cb *ComboBox) TextSelection() (start, end int) {
+	defer escape(unsafe.Pointer(&start))
+	defer escape(unsafe.Pointer(&end))
+
 	cb.SendMessage(win.CB_GETEDITSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }

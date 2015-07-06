@@ -55,6 +55,8 @@ func hPackedDIBFromHBITMAP(hBmp win.HBITMAP) (win.HGLOBAL, error) {
 
 func hBitmapFromImage(im image.Image) (win.HBITMAP, error) {
 	var bi win.BITMAPV5HEADER
+	defer escape(unsafe.Pointer(&bi))
+
 	bi.BiSize = uint32(unsafe.Sizeof(bi))
 	bi.BiWidth = int32(im.Bounds().Dx())
 	bi.BiHeight = -int32(im.Bounds().Dy())

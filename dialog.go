@@ -172,6 +172,7 @@ var firstFocusableDescendantCallbackPtr = syscall.NewCallback(firstFocusableDesc
 
 func firstFocusableDescendant(container Container) Window {
 	var hwnd win.HWND
+	defer escape(unsafe.Pointer(&hwnd))
 
 	win.EnumChildWindows(container.Handle(), firstFocusableDescendantCallbackPtr, uintptr(unsafe.Pointer(&hwnd)))
 

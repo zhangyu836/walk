@@ -43,7 +43,7 @@ type TableView struct {
 	imageProvider                      ImageProvider
 	hIml                               win.HIMAGELIST
 	usingSysIml                        bool
-	imageUintptr2Index                 map[uintptr]int32
+	imagePtr2Index                     map[unsafe.Pointer]int32
 	filePath2IconIndex                 map[string]int32
 	rowsResetHandlerHandle             int
 	rowChangedHandlerHandle            int
@@ -70,7 +70,7 @@ type TableView struct {
 func NewTableView(parent Container) (*TableView, error) {
 	tv := &TableView{
 		alternatingRowBGColor: defaultTVRowBGColor,
-		imageUintptr2Index:    make(map[uintptr]int32),
+		imagePtr2Index:        make(map[unsafe.Pointer]int32),
 		filePath2IconIndex:    make(map[string]int32),
 		selectedIndexes:       NewIndexList(nil),
 	}
@@ -249,7 +249,9 @@ func (tv *TableView) Columns() *TableViewColumnList {
 // order.
 func (tv *TableView) VisibleColumnsInDisplayOrder() []*TableViewColumn {
 	visibleCols := tv.visibleColumns()
+
 	indices := make([]int32, len(visibleCols))
+	defer escape(unsafe.Pointer(&indices))
 
 	if win.FALSE == tv.SendMessage(win.LVM_GETCOLUMNORDERARRAY, uintptr(len(indices)), uintptr(unsafe.Pointer(&indices[0]))) {
 		newError("LVM_GETCOLUMNORDERARRAY")
@@ -510,10 +512,10 @@ func (tv *TableView) setSortIcon(index int, order SortOrder) error {
 			Mask: win.HDI_FORMAT,
 		}
 
-		iPtr := uintptr(i)
-		itemPtr := uintptr(unsafe.Pointer(&item))
+		lp := unsafe.Pointer(&item)
+		defer escape(lp)
 
-		if win.SendMessage(headerHwnd, win.HDM_GETITEM, iPtr, itemPtr) == 0 {
+		if win.SendMessage(headerHwnd, win.HDM_GETITEM, uintptr(i), uintptr(lp)) == 0 {
 			return newError("SendMessage(HDM_GETITEM)")
 		}
 
@@ -531,7 +533,7 @@ func (tv *TableView) setSortIcon(index int, order SortOrder) error {
 			item.Fmt &^= win.HDF_SORTDOWN | win.HDF_SORTUP
 		}
 
-		if win.SendMessage(headerHwnd, win.HDM_SETITEM, iPtr, itemPtr) == 0 {
+		if win.SendMessage(headerHwnd, win.HDM_SETITEM, uintptr(i), uintptr(lp)) == 0 {
 			return newError("SendMessage(HDM_SETITEM)")
 		}
 	}
@@ -565,6 +567,7 @@ func (tv *TableView) CurrentIndex() int {
 // Call this with a value of -1 to have no current item.
 func (tv *TableView) SetCurrentIndex(value int) error {
 	var lvi win.LVITEM
+	defer escape(unsafe.Pointer(&lvi))
 
 	lvi.StateMask = win.LVIS_FOCUSED | win.LVIS_SELECTED
 	if value > -1 {
@@ -772,11 +775,12 @@ func (tv *TableView) SaveState() error {
 
 	visibleCols := tv.visibleColumns()
 	indices := make([]int32, len(visibleCols))
-	var lParam uintptr
+	var lp unsafe.Pointer
 	if len(visibleCols) > 0 {
-		lParam = uintptr(unsafe.Pointer(&indices[0]))
+		lp = unsafe.Pointer(&indices[0])
+		defer escape(lp)
 	}
-	if 0 == tv.SendMessage(win.LVM_GETCOLUMNORDERARRAY, uintptr(len(visibleCols)), lParam) {
+	if 0 == tv.SendMessage(win.LVM_GETCOLUMNORDERARRAY, uintptr(len(visibleCols)), uintptr(lp)) {
 		return newError("LVM_GETCOLUMNORDERARRAY")
 	}
 
@@ -871,12 +875,13 @@ func (tv *TableView) RestoreState() error {
 		}
 	}
 
-	wParam := uintptr(len(indices))
-	var lParam uintptr
+	wp := uintptr(len(indices))
+	var lp unsafe.Pointer
 	if len(indices) > 0 {
-		lParam = uintptr(unsafe.Pointer(&indices[0]))
+		lp = unsafe.Pointer(&indices[0])
+		defer escape(lp)
 	}
-	if 0 == tv.SendMessage(win.LVM_SETCOLUMNORDERARRAY, wParam, lParam) {
+	if 0 == tv.SendMessage(win.LVM_SETCOLUMNORDERARRAY, wp, uintptr(lp)) {
 		return newError("LVM_SETCOLUMNORDERARRAY")
 	}
 
@@ -1040,9 +1045,11 @@ func (tv *TableView) restoreStateOldStyle(state string) error {
 		}
 
 		if !failed {
-			wParam := uintptr(len(indices))
-			lParam := uintptr(unsafe.Pointer(&indices[0]))
-			if 0 == tv.SendMessage(win.LVM_SETCOLUMNORDERARRAY, wParam, lParam) {
+			wp := uintptr(len(indices))
+			lp := unsafe.Pointer(&indices[0])
+			defer escape(lp)
+
+			if 0 == tv.SendMessage(win.LVM_SETCOLUMNORDERARRAY, wp, uintptr(lp)) {
 				return newError("LVM_SETCOLUMNORDERARRAY")
 			}
 		}
@@ -1099,7 +1106,7 @@ func (tv *TableView) applyImageListForImage(image interface{}) {
 
 	tv.SendMessage(win.LVM_SETIMAGELIST, win.LVSIL_SMALL, uintptr(tv.hIml))
 
-	tv.imageUintptr2Index = make(map[uintptr]int32)
+	tv.imagePtr2Index = make(map[unsafe.Pointer]int32)
 	tv.filePath2IconIndex = make(map[string]int32)
 }
 
@@ -1111,7 +1118,7 @@ func (tv *TableView) disposeImageListAndCaches() {
 	}
 	tv.hIml = 0
 
-	tv.imageUintptr2Index = nil
+	tv.imagePtr2Index = nil
 	tv.filePath2IconIndex = nil
 }
 
@@ -1134,6 +1141,8 @@ func (tv *TableView) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) 
 
 	case win.WM_LBUTTONDOWN, win.WM_RBUTTONDOWN, win.WM_LBUTTONDBLCLK, win.WM_RBUTTONDBLCLK:
 		var hti win.LVHITTESTINFO
+		defer escape(unsafe.Pointer(&hti))
+
 		hti.Pt = win.POINT{win.GET_X_LPARAM(lParam), win.GET_Y_LPARAM(lParam)}
 		tv.SendMessage(win.LVM_HITTEST, 0, uintptr(unsafe.Pointer(&hti)))
 
@@ -1223,7 +1232,7 @@ func (tv *TableView) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) 
 						image,
 						tv.hIml,
 						tv.usingSysIml,
-						tv.imageUintptr2Index,
+						tv.imagePtr2Index,
 						tv.filePath2IconIndex)
 				}
 			}

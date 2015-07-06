@@ -93,6 +93,8 @@ func (sb *StatusBar) updateParts() error {
 		rightEdges[0] = -1
 	}
 
+	defer escape(unsafe.Pointer(rep))
+
 	if 0 == sb.SendMessage(
 		win.SB_SETPARTS,
 		uintptr(len(items)),
@@ -258,6 +260,8 @@ func (sbi *StatusBarItem) updateText(index int) error {
 		return err
 	}
 
+	defer escape(unsafe.Pointer(utf16))
+
 	if 0 == sbi.sb.SendMessage(
 		win.SB_SETTEXT,
 		uintptr(win.MAKEWORD(byte(index), 0)),
@@ -274,6 +278,8 @@ func (sbi *StatusBarItem) updateToolTipText(index int) error {
 	if err != nil {
 		return err
 	}
+
+	defer escape(unsafe.Pointer(utf16))
 
 	sbi.sb.SendMessage(
 		win.SB_SETTIPTEXT,

@@ -476,7 +476,10 @@ func (nle *numberLineEdit) selectNumber() {
 
 func (nle *numberLineEdit) textUTF16() []uint16 {
 	textLength := nle.SendMessage(win.WM_GETTEXTLENGTH, 0, 0)
+
 	buf := make([]uint16, textLength+1)
+	defer escape(unsafe.Pointer(&buf))
+
 	nle.SendMessage(win.WM_GETTEXT, uintptr(textLength+1), uintptr(unsafe.Pointer(&buf[0])))
 
 	return buf[:len(buf)-1]

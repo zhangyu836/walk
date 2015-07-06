@@ -286,6 +286,7 @@ func (tvc *TableViewColumn) indexInListView() int32 {
 
 func (tvc *TableViewColumn) create() error {
 	var lvc win.LVCOLUMN
+	defer escape(unsafe.Pointer(&lvc))
 
 	index := tvc.indexInListView()
 
@@ -332,6 +333,7 @@ func (tvc *TableViewColumn) update() error {
 	}
 
 	lvc := tvc.getLVCOLUMN()
+	defer escape(unsafe.Pointer(lvc))
 
 	if win.FALSE == tvc.tv.SendMessage(win.LVM_SETCOLUMN, uintptr(tvc.indexInListView()), uintptr(unsafe.Pointer(lvc))) {
 		return newError("LVM_SETCOLUMN")

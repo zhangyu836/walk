@@ -62,6 +62,7 @@ func (tt *ToolTip) SizeHint() Size {
 
 func (tt *ToolTip) Title() string {
 	var gt win.TTGETTITLE
+	defer escape(unsafe.Pointer(&gt))
 
 	buf := make([]uint16, 100)
 
@@ -95,7 +96,10 @@ func (tt *ToolTip) setTitle(title string, icon uintptr) error {
 		title = title[:99]
 	}
 
-	if win.FALSE == tt.SendMessage(win.TTM_SETTITLE, icon, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title)))) {
+	lp := unsafe.Pointer(syscall.StringToUTF16Ptr(title))
+	defer escape(lp)
+
+	if win.FALSE == tt.SendMessage(win.TTM_SETTITLE, icon, uintptr(lp)) {
 		return newError("TTM_SETTITLE failed")
 	}
 
@@ -106,6 +110,8 @@ func (tt *ToolTip) AddTool(tool Widget) error {
 	hwnd := tool.Handle()
 
 	var ti win.TOOLINFO
+	defer escape(unsafe.Pointer(&ti))
+
 	ti.CbSize = uint32(unsafe.Sizeof(ti))
 	ti.Hwnd = hwnd
 	ti.UFlags = win.TTF_IDISHWND | win.TTF_SUBCLASS
@@ -122,6 +128,8 @@ func (tt *ToolTip) RemoveTool(tool Widget) error {
 	hwnd := tool.Handle()
 
 	var ti win.TOOLINFO
+	defer escape(unsafe.Pointer(&ti))
+
 	ti.CbSize = uint32(unsafe.Sizeof(ti))
 	ti.Hwnd = hwnd
 	ti.UId = uintptr(hwnd)
@@ -145,6 +153,7 @@ func (tt *ToolTip) SetText(tool Widget, text string) error {
 	if ti == nil {
 		return newError("unknown tool")
 	}
+	defer escape(unsafe.Pointer(ti))
 
 	if len(text) > 79 {
 		text = text[:79]
@@ -159,6 +168,8 @@ func (tt *ToolTip) SetText(tool Widget, text string) error {
 
 func (tt *ToolTip) toolInfo(tool Widget) *win.TOOLINFO {
 	var ti win.TOOLINFO
+	defer escape(unsafe.Pointer(&ti))
+
 	var buf [80]uint16
 
 	hwnd := tool.Handle()

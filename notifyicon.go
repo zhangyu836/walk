@@ -136,6 +136,7 @@ func NewNotifyIcon() (*NotifyIcon, error) {
 		hWnd:        hWnd,
 		contextMenu: menu,
 	}
+	defer escape(unsafe.Pointer(ni))
 
 	// Set our *NotifyIcon as user data for the message window.
 	win.SetWindowLongPtr(hWnd, win.GWLP_USERDATA, uintptr(unsafe.Pointer(ni)))

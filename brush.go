@@ -56,9 +56,13 @@ func (b *nullBrush) logbrush() *win.LOGBRUSH {
 	return &win.LOGBRUSH{LbStyle: win.BS_NULL}
 }
 
-var nullBrushSingleton Brush = newNullBrush()
+var nullBrushSingleton Brush
 
 func NullBrush() Brush {
+	if nullBrushSingleton == nil {
+		nullBrushSingleton = newNullBrush()
+	}
+
 	return nullBrushSingleton
 }
 
