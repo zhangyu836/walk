@@ -290,6 +290,10 @@ var (
 // InitWidget. Calling MustRegisterWindowClass twice with the same className
 // results in a panic.
 func MustRegisterWindowClass(className string) {
+	MustRegisterWindowClassWithWndProcPtr(className, defaultWndProcPtr)
+}
+
+func MustRegisterWindowClassWithWndProcPtr(className string, wndProcPtr uintptr) {
 	if registeredWindowClasses[className] {
 		panic("window class already registered")
 	}
@@ -311,7 +315,7 @@ func MustRegisterWindowClass(className string) {
 
 	var wc win.WNDCLASSEX
 	wc.CbSize = uint32(unsafe.Sizeof(wc))
-	wc.LpfnWndProc = defaultWndProcPtr
+	wc.LpfnWndProc = wndProcPtr
 	wc.HInstance = hInst
 	wc.HIcon = hIcon
 	wc.HCursor = hCursor
@@ -526,6 +530,9 @@ func (wb *WindowBase) SetName(name string) {
 func (wb *WindowBase) writePath(buf *bytes.Buffer) {
 	hWndParent := win.GetAncestor(wb.hWnd, win.GA_PARENT)
 	if pwi := windowFromHandle(hWndParent); pwi != nil {
+		if sv, ok := pwi.(*ScrollView); ok {
+			pwi = sv.Parent()
+		}
 		pwi.AsWindowBase().writePath(buf)
 		buf.WriteByte('/')
 	}
