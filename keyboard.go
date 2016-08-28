@@ -387,9 +387,9 @@ var modifiers2string = map[Modifiers]string{
 }
 
 const (
-	ModShift Modifiers = 1 << iota
+	ModAlt Modifiers = 1 << iota
 	ModControl
-	ModAlt
+	ModShift
 )
 
 func ModifiersDown() Modifiers {
