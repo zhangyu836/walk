@@ -125,6 +125,10 @@ func (c *ClipboardService) SetText(s string) error {
 		if err != nil {
 			return err
 		}
+		
+		if !win.EmptyClipboard() {
+			return lastError("EmptyClipboard")
+		}
 
 		hMem := win.GlobalAlloc(win.GMEM_MOVEABLE, uintptr(len(utf16)*2))
 		if hMem == 0 {
